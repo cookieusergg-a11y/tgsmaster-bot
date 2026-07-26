@@ -127,7 +127,6 @@ async def lifespan(app: FastAPI):
     global bot_app
     logger.info("Запуск приложения...")
     
-    # Создаём бота
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -135,13 +134,14 @@ async def lifespan(app: FastAPI):
     await bot_app.initialize()
     logger.info("Бот инициализирован")
     
-    # Удаляем вебхук с принудительным сбросом зависших обновлений
-    await bot_app.bot.delete_webhook(drop_pending_updates=True)
-    logger.info("Вебхук удалён, зависшие обновления сброшены")
+    # Получаем URL сервера из переменной окружения Railway
+    webhook_url = f"https://{os.getenv('RAILWAY_STATIC_URL', 'localhost')}/webhook"
+    # Или можно указать вручную:
+    # webhook_url = "https://твой-домен.up.railway.app/webhook"
     
-    # Запускаем поллинг с дропом зависших обновлений (чтобы избежать 409 Conflict)
-    asyncio.create_task(bot_app.updater.start_polling(drop_pending_updates=True))
-    logger.info("Бот запущен в режиме поллинга")
+    # Устанавливаем вебхук (вместо поллинга)
+    await bot_app.bot.set_webhook(url=webhook_url)
+    logger.info(f"Вебхук установлен на {webhook_url}")
     
     await init_db()
     
@@ -168,6 +168,19 @@ class VerifyRequest(BaseModel):
 class GrantRequest(BaseModel):
     user_id: int
     days: int
+
+# ===== ВЕБХУК ДЛЯ TELEGRAM =====
+@app.post("/webhook")
+async def webhook(request: Request):
+    """Принимает обновления от Telegram."""
+    try:
+        data = await request.json()
+        update = Update.de_json(data, bot_app.bot)
+        await bot_app.process_update(update)
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Ошибка в вебхуке: {e}")
+        return {"ok": False}
 
 @app.post("/verify-code")
 async def verify_code(req: VerifyRequest):
