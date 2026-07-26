@@ -13,7 +13,7 @@ import aiosqlite
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ===== ВКЛЮЧАЕМ ЛОГИРОВАНИЕ =====
+# ===== ЛОГИРОВАНИЕ =====
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ async def lifespan(app: FastAPI):
     global bot_app
     logger.info("Запуск приложения...")
     
-    # Создаём бота с новым токеном
+    # Создаём бота
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -135,12 +135,12 @@ async def lifespan(app: FastAPI):
     await bot_app.initialize()
     logger.info("Бот инициализирован")
     
-    # Принудительно удаляем вебхук (если был)
-    await bot_app.bot.delete_webhook()
-    logger.info("Вебхук удалён (если был)")
+    # Удаляем вебхук с принудительным сбросом зависших обновлений
+    await bot_app.bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Вебхук удалён, зависшие обновления сброшены")
     
-    # Запускаем поллинг в фоне
-    asyncio.create_task(bot_app.updater.start_polling())
+    # Запускаем поллинг с дропом зависших обновлений (чтобы избежать 409 Conflict)
+    asyncio.create_task(bot_app.updater.start_polling(drop_pending_updates=True))
     logger.info("Бот запущен в режиме поллинга")
     
     await init_db()
@@ -151,6 +151,7 @@ async def lifespan(app: FastAPI):
         await bot_app.shutdown()
         logger.info("Бот остановлен")
 
+# ===== FASTAPI =====
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
