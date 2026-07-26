@@ -100,7 +100,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # Защита от спама
     if user_id in pending_codes and time.time() - pending_codes[user_id][1] < 30:
         await update.message.reply_text("⏳ Подожди 30 секунд перед новым запросом.")
         return
@@ -111,19 +110,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# ===== FASTAPI =====
+# ===== СОЗДАНИЕ ПРИЛОЖЕНИЯ БОТА (глобально) =====
+bot_app = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Запускаем бота в фоновом режиме
-    loop = asyncio.get_event_loop()
+    global bot_app
+    # Создаём Application (в PTB 21.x нет Updater, всё через Application)
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    # Запускаем поллинг в отдельной задаче
+    # Запускаем поллинг в фоновой задаче (не блокируем)
     asyncio.create_task(bot_app.run_polling())
     await init_db()
     yield
+    # Здесь можно остановить бота при завершении, но для простоты пропустим
 
+# ===== FASTAPI =====
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -152,16 +155,9 @@ async def send_code(req: CodeRequest):
         raise HTTPException(400, "Подождите 30 секунд")
     code = f"{random.randint(100000, 999999)}"
     pending_codes[user_id] = (code, time.time())
-    # Отправка через бота (бот уже запущен, но у нас нет доступа к нему напрямую)
-    # Используем метод send_message через Application (но он запущен в другом потоке)
-    # Проще отправить через bot объект, но у нас нет доступа к bot внутри lifespan.
-    # Для упрощения мы создадим отдельный экземпляр bot для отправки.
-    # Но можно использовать уже созданный bot_app.bot.
-    # Так как мы не сохраняем bot_app глобально, создадим новый экземпляр для отправки.
     try:
-        # Создаём временный бот только для отправки
-        temp_bot = Application.builder().token(BOT_TOKEN).build().bot
-        await temp_bot.send_message(
+        # Используем глобальный объект bot_app для отправки
+        await bot_app.bot.send_message(
             chat_id=user_id,
             text=f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.",
             parse_mode="Markdown"
