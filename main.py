@@ -109,20 +109,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# ===== СОЗДАЁМ ПРИЛОЖЕНИЕ БОТА (глобально) =====
+# ===== ГЛОБАЛЬНЫЙ ОБЪЕКТ БОТА =====
 bot_app = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app
-    # Инициализация бота
+    # Создаём приложение бота
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Запускаем бота в фоновом режиме (не блокируя)
+    # Инициализация (подготовка вебхуков и т.п., но мы используем поллинг)
     await bot_app.initialize()
-    asyncio.create_task(bot_app.start_polling())
+    
+    # Запускаем поллинг в фоновой задаче (не блокируем)
+    asyncio.create_task(bot_app.updater.start_polling())
     
     # Инициализация БД
     await init_db()
@@ -162,7 +164,6 @@ async def send_code(req: CodeRequest):
     code = f"{random.randint(100000, 999999)}"
     pending_codes[user_id] = (code, time.time())
     try:
-        # Используем глобальный объект бота
         await bot_app.bot.send_message(
             chat_id=user_id,
             text=f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.",
