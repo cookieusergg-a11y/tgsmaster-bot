@@ -1,3 +1,4 @@
+import os  # <--- ДОБАВИЛ
 import asyncio
 import random
 import time
@@ -17,7 +18,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ===== НОВЫЙ ТОКЕН =====
+# ===== ТОКЕН И КОНФИГ =====
 BOT_TOKEN = "8546786613:AAGpcqtJFrCi7zSw6jbC50sjudL0dxgYt_M"
 ADMIN_ID = 8953762615
 DB_PATH = "data.db"
@@ -134,12 +135,10 @@ async def lifespan(app: FastAPI):
     await bot_app.initialize()
     logger.info("Бот инициализирован")
     
-    # Получаем URL сервера из переменной окружения Railway
-    webhook_url = f"https://{os.getenv('RAILWAY_STATIC_URL', 'localhost')}/webhook"
-    # Или можно указать вручную:
-    # webhook_url = "https://твой-домен.up.railway.app/webhook"
+    # Твой домен (исправлено: без лишнего слеша в конце)
+    webhook_url = "https://tgsmaster.up.railway.app/webhook"
     
-    # Устанавливаем вебхук (вместо поллинга)
+    # Устанавливаем вебхук
     await bot_app.bot.set_webhook(url=webhook_url)
     logger.info(f"Вебхук установлен на {webhook_url}")
     
