@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TgsMaster — редактор Lottie</title>
+    <!-- Lottie-web для рендеринга -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+    <!-- Lottie-converter для экспорта в TGS (используем CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/lottie-converter@1.0.0/dist/lottie-converter.min.js"></script>
+    <style>
+        /* ===== ГЛОБАЛЬНЫЕ СТИЛИ (в стиле Swiloze) ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --bg: #050505;
+            --bg-card: #101010;
+            --bg-hover: #171717;
+            --bg-input: #090909;
+            --border: rgba(255,255,255,0.11);
+            --accent: #ffffff;
+            --accent-bright: #ffffff;
+            --accent-dim: #3a3a3a;
+            --accent-dark: #d9d9d9;
+            --accent-contrast: #000;
+            --text: #f8f8f8;
+            --text-muted: #a1a1a1;
+            --text-dim: #7a7a7a;
+            --accent-06: rgba(255,255,255,0.06);
+            --accent-10: rgba(255,255,255,0.10);
+            --accent-15: rgba(255,255,255,0.15);
+            --accent-20: rgba(255,255,255,0.20);
+            --accent-25: rgba(255,255,255,0.25);
+            --accent-30: rgba(255,255,255,0.30);
+            --border-focus: #ffffff;
+            --font: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .app {
+            max-width: 1400px;
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        /* ===== ШАПКА ===== */
+        .titlebar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .titlebar .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .titlebar .logo img {
+            height: 28px;
+            width: auto;
+        }
+        .titlebar .logo span {
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 1px;
+            color: var(--text);
+        }
+        .titlebar .logo span small {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 14px;
+        }
+        .titlebar .user-info {
+            font-size: 14px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .titlebar .user-info .name {
+            color: var(--text);
+            font-weight: 500;
+        }
+        .titlebar .user-info .logout-btn {
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .titlebar .user-info .logout-btn:hover {
+            background: var(--border);
+        }
+
+        /* ===== РАБОЧАЯ ОБЛАСТЬ ===== */
+        .workspace {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 16px;
+            gap: 16px;
+        }
+        /* Левая панель (настройки) */
+        .panel {
+            flex: 1 1 380px;
+            min-width: 300px;
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .panel::-webkit-scrollbar {
+            width: 4px;
+        }
+        .panel::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .panel .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin: 16px 0 8px;
+            text-transform: uppercase;
+        }
+        .panel .section-title:first-of-type {
+            margin-top: 0;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            background: var(--bg-input);
+        }
+        .drop-zone:hover {
+            border-color: var(--accent-dim);
+            background: var(--bg-hover);
+        }
+        .drop-zone svg {
+            width: 32px;
+            height: 32px;
+            stroke: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .drop-zone .dz-text {
+            color: var(--text);
+            font-weight: 500;
+        }
+        .drop-zone .dz-sub {
+            color: var(--text-dim);
+            font-size: 13px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .input-group label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .input-group input,
+        .input-group select,
+        .input-group .color-picker-wrap {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: var(--text);
+            font-size: 14px;
+            width: 100%;
+        }
+        .input-group input:focus,
+        .input-group select:focus {
+            border-color: var(--border-focus);
+            outline: none;
+        }
+        .input-group .color-picker-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 10px;
+        }
+        .input-group .color-picker-wrap input[type="color"] {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .input-group .color-picker-wrap span {
+            flex: 1;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .slider-row label {
+            font-size: 13px;
+            color: var(--text-muted);
+            min-width: 70px;
+        }
+        .slider-row input[type="range"] {
+            flex: 1;
+            background: var(--bg-input);
+            height: 4px;
+            border-radius: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .slider-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-bright);
+            cursor: pointer;
+        }
+        .slider-row .value {
+            min-width: 40px;
+            text-align: right;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .btn-primary {
+            background: #a78bfa;
+            border: none;
+            color: #000;
+            font-weight: 600;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 15px;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+        .btn-primary:hover {
+            background: #8b5cf6;
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .btn-group .btn-secondary {
+            flex: 1;
+            text-align: center;
+        }
+
+        /* ===== ПРЕВЬЮ ===== */
+        .preview-pane {
+            flex: 2 1 500px;
+            min-width: 300px;
+            background: var(--bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .preview-pane .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .preview-pane .preview-header span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .canvas-wrap {
+            flex: 1;
+            min-height: 300px;
+            background: var(--bg-input);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .canvas-wrap #lottie-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .canvas-wrap #lottie-container svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .placeholder-text {
+            color: var(--text-dim);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* ===== СЛОИ ===== */
+        .layers-panel {
+            flex: 1 1 200px;
+            min-width: 180px;
+            background: var(--bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 12px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .layers-panel .layer-item {
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .layers-panel .layer-item .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            flex-shrink: 0;
+        }
+        .layers-panel .layer-item .indicator.shape {
+            background: #f59e0b;
+        }
+        .layers-panel .layer-item .indicator.text {
+            background: #3b82f6;
+        }
+        .layers-panel .layer-item .indicator.image {
+            background: #8b5cf6;
+        }
+        .layers-panel .layer-item .indicator.solid {
+            background: #10b981;
+        }
+
+        /* ===== АДМИН-ПАНЕЛЬ (встраивается в интерфейс) ===== */
+        .admin-panel {
+            margin-top: 16px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+            display: none;
+        }
+        .admin-panel.visible {
+            display: block;
+        }
+        .admin-panel h3 {
+            color: #a78bfa;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .admin-panel .admin-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .admin-panel .admin-row input {
+            flex: 1;
+            min-width: 80px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: var(--text);
+        }
+        .admin-panel .admin-row button {
+            background: #a78bfa;
+            border: none;
+            color: #000;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .admin-panel .admin-row button:hover {
+            background: #8b5cf6;
+        }
+        .admin-panel .user-list {
+            margin-top: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .admin-panel .user-list .user-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .admin-panel .user-list .user-item .status {
+            font-weight: 500;
+        }
+        .admin-panel .user-list .user-item .status.active {
+            color: #4ade80;
+        }
+        .admin-panel .user-list .user-item .status.inactive {
+            color: #f87171;
+        }
+
+        /* ===== ОВЕРЛЕЙ ВХОДА ===== */
+        #login-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s;
+        }
+        #login-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px 24px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+        }
+        .login-box h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .login-box p {
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .login-box input:focus {
+            border-color: var(--border-focus);
+            outline: none;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background: #a78bfa;
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .login-box button:hover {
+            background: #8b5cf6;
+        }
+        .login-box .status {
+            margin: 8px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .login-box .status.error {
+            color: #f87171;
+        }
+        .login-box .status.success {
+            color: #4ade80;
+        }
+        .login-box .hint {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* ===== АДАПТИВ ===== */
+        @media (max-width: 768px) {
+            .workspace {
+                flex-direction: column;
+            }
+            .panel, .preview-pane, .layers-panel {
+                flex: none;
+                width: 100%;
+                max-height: none;
+            }
+            .titlebar .logo span small {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== ОВЕРЛЕЙ ВХОДА ===== -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h1>🔐 TgsMaster</h1>
+            <p>Войдите через код от бота</p>
+            <input type="number" id="login-user-id" placeholder="Ваш Telegram ID">
+            <button id="login-get-code">Получить код</button>
+            <div id="login-status" class="status">Введите ID и нажмите «Получить код»</div>
+            <input type="text" id="login-code" placeholder="Код из Telegram">
+            <button id="login-verify">Войти</button>
+            <div class="hint">Бот: @TgsMasterBot · Данные защищены</div>
+        </div>
+    </div>
+
+    <!-- ===== ОСНОВНОЕ ПРИЛОЖЕНИЕ ===== -->
+    <div class="app" id="app" style="display:none;">
+        <!-- Шапка -->
+        <div class="titlebar">
+            <div class="logo">
+                <img src="https://swlz.fun/logo.png" alt="TgsMaster">
+                <span>TGSMASTER <small>редактор</small></span>
+            </div>
+            <div class="user-info">
+                <span class="name" id="user-name-display">User</span>
+                <button class="logout-btn" id="logout-btn">Выйти</button>
+            </div>
+        </div>
+
+        <!-- Рабочая область -->
+        <div class="workspace">
+            <!-- Панель настроек -->
+            <div class="panel" id="settings-panel">
+                <!-- Загрузка JSON -->
+                <div class="section-title">Файл</div>
+                <div class="drop-zone" id="drop-zone">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3"/></svg>
+                    <div class="dz-text">Загрузите .json</div>
+                    <div class="dz-sub">Перетащите или нажмите</div>
+                </div>
+                <input type="file" id="file-input" accept=".json" style="display:none;">
+
+                <!-- Настройка текста -->
+                <div class="section-title">Текст</div>
+                <div class="input-group">
+                    <label>Текст</label>
+                    <input type="text" id="text-content" placeholder="Ваш ник" value="">
+                </div>
+                <div class="input-group">
+                    <label>Шрифт</label>
+                    <select id="text-font">
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Inter">Inter</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Цвет текста</label>
+                    <div class="color-picker-wrap">
+                        <input type="color" id="text-color" value="#ffffff">
+                        <span>#ffffff</span>
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <label>Размер</label>
+                    <input type="range" id="text-size" min="10" max="100" value="40">
+                    <span class="value" id="text-size-value">40</span>
+                </div>
+
+                <!-- Настройка позиции и поворота -->
+                <div class="section-title">Позиция</div>
+                <div class="slider-row">
+                    <label>X</label>
+                    <input type="range" id="pos-x" min="-200" max="200" value="0">
+                    <span class="value" id="pos-x-value">0</span>
+                </div>
+                <div class="slider-row">
+                    <label>Y</label>
+                    <input type="range" id="pos-y" min="-200" max="200" value="0">
+                    <span class="value" id="pos-y-value">0</span>
+                </div>
+                <div class="slider-row">
+                    <label>Ротация</label>
+                    <input type="range" id="pos-rotate" min="-180" max="180" value="0">
+                    <span class="value" id="pos-rotate-value">0°</span>
+                </div>
+
+                <!-- Цвета заливки слоёв -->
+                <div class="section-title">Цвета слоёв</div>
+                <div class="input-group">
+                    <label>Заливка (Solid)</label>
+                    <div class="color-picker-wrap">
+                        <input type="color" id="fill-color" value="#8b5cf6">
+                        <span>#8b5cf6</span>
+                    </div>
+                </div>
+                <button class="btn-primary" id="apply-colors-btn">Применить цвета к слоям</button>
+
+                <!-- Действия -->
+                <div class="section-title">Экспорт</div>
+                <div class="btn-group">
+                    <button class="btn-secondary" id="export-json-btn">📄 JSON</button>
+                    <button class="btn-secondary" id="export-tgs-btn">📦 TGS</button>
+                </div>
+                <button class="btn-primary" id="reset-animation-btn" style="margin-top:12px;">🔄 Сбросить анимацию</button>
+
+                <!-- Админ-панель (видна только админу) -->
+                <div class="admin-panel" id="admin-panel">
+                    <h3>⚡ Админ-панель</h3>
+                    <div class="admin-row">
+                        <input type="text" id="admin-grant-id" placeholder="ID пользователя">
+                        <input type="number" id="admin-grant-days" placeholder="Дни" min="1">
+                        <button id="admin-grant-btn">Выдать</button>
+                    </div>
+                    <div id="admin-grant-msg" style="font-size:13px; color:#fbbf24; margin-top:4px;"></div>
+                    <div class="user-list" id="admin-user-list">
+                        <div style="color:var(--text-dim); font-size:13px;">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Предпросмотр -->
+            <div class="preview-pane">
+                <div class="preview-header">
+                    <span>Предпросмотр</span>
+                    <span id="anim-name" style="font-size:13px; color:var(--text-dim);">нет анимации</span>
+                </div>
+                <div class="canvas-wrap" id="canvas-wrap">
+                    <div id="lottie-container"></div>
+                    <div class="placeholder-text" id="placeholder-text">Загрузите JSON, чтобы увидеть анимацию</div>
+                </div>
+            </div>
+
+            <!-- Слои -->
+            <div class="layers-panel" id="layers-panel">
+                <div style="font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">Слои</div>
+                <div id="layer-list">
+                    <div style="color:var(--text-dim); font-size:13px;">Нет данных</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== СКРИПТЫ ===== -->
+    <script>
+        // ================================================================
+        // 1. ЛОГИКА ВХОДА ПО КОДУ
+        // ================================================================
+        const API_BASE = window.location.origin; // замените на ваш сервер
+        const ADMIN_ID = 8953762615;
+
+        let currentUser = null; // { id, name }
+
+        const loginOverlay = document.getElementById('login-overlay');
+        const appContainer = document.getElementById('app');
+        const loginUserId = document.getElementById('login-user-id');
+        const loginGetCode = document.getElementById('login-get-code');
+        const loginStatus = document.getElementById('login-status');
+        const loginCode = document.getElementById('login-code');
+        const loginVerify = document.getElementById('login-verify');
+        const userNameDisplay = document.getElementById('user-name-display');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // Проверка сессии
+        function loadSession() {
+            const saved = localStorage.getItem('tgs_user');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    if (data.id) {
+                        currentUser = data;
+                        return true;
+                    }
+                } catch(e) {}
+            }
+            return false;
+        }
+
+        function saveSession(user) {
+            localStorage.setItem('tgs_user', JSON.stringify(user));
+            currentUser = user;
+        }
+
+        function clearSession() {
+            localStorage.removeItem('tgs_user');
+            currentUser = null;
+        }
+
+        function showApp() {
+            loginOverlay.classList.add('hidden');
+            appContainer.style.display = 'block';
+            userNameDisplay.textContent = currentUser.name + ' (ID: ' + currentUser.id + ')';
+            if (currentUser.id === ADMIN_ID) {
+                document.getElementById('admin-panel').classList.add('visible');
+                loadAdminUsers();
+            } else {
+                document.getElementById('admin-panel').classList.remove('visible');
+            }
+        }
+
+        function showLogin() {
+            loginOverlay.classList.remove('hidden');
+            appContainer.style.display = 'none';
+        }
+
+        // Запрос кода
+        loginGetCode.addEventListener('click', async () => {
+            const id = parseInt(loginUserId.value);
+            if (!id) {
+                loginStatus.textContent = 'Введите корректный ID';
+                loginStatus.className = 'status error';
+                return;
+            }
+            loginStatus.textContent = 'Отправка...';
+            loginStatus.className = 'status';
+            try {
+                const res = await fetch(`${API_BASE}/send-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: id })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loginStatus.textContent = '✅ Код отправлен в Telegram!';
+                    loginStatus.className = 'status success';
+                } else {
+                    loginStatus.textContent = '❌ ' + data.detail;
+                    loginStatus.className = 'status error';
+                }
+            } catch(e) {
+                loginStatus.textContent = 'Ошибка соединения с сервером';
+                loginStatus.className = 'status error';
+            }
+        });
+
+        // Верификация кода
+        loginVerify.addEventListener('click', async () => {
+            const id = parseInt(loginUserId.value);
+            const code = loginCode.value.trim();
+            if (!id || !code) {
+                loginStatus.textContent = 'Заполните все поля';
+                loginStatus.className = 'status error';
+                return;
+            }
+            loginStatus.textContent = 'Проверка...';
+            loginStatus.className = 'status';
+            try {
+                const res = await fetch(`${API_BASE}/verify-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: id, code: code })
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    saveSession(data.user);
+                    showApp();
+                } else {
+                    loginStatus.textContent = data.detail || 'Неверный код';
+                    loginStatus.className = 'status error';
+                }
+            } catch(e) {
+                loginStatus.textContent = 'Ошибка сервера';
+                loginStatus.className = 'status error';
+            }
+        });
+
+        // Выход
+        logoutBtn.addEventListener('click', () => {
+            clearSession();
+            showLogin();
+            // перезагружаем редактор
+            location.reload(); // или просто сброс
+        });
+
+        // Инициализация
+        if (loadSession()) {
+            showApp();
+        } else {
+            showLogin();
+        }
+
+        // ================================================================
+        // 2. РЕДАКТОР LOTTIE (полноценный)
+        // ================================================================
+
+        // Переменные состояния
+        let animationData = null; // исходный JSON
+        let animInstance = null; // lottie-экземпляр
+        let layers = [];
+
+        // DOM элементы редактора
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const lottieContainer = document.getElementById('lottie-container');
+        const placeholderText = document.getElementById('placeholder-text');
+        const animName = document.getElementById('anim-name');
+
+        // Настройки
+        const textContent = document.getElementById('text-content');
+        const textFont = document.getElementById('text-font');
+        const textColor = document.getElementById('text-color');
+        const textSize = document.getElementById('text-size');
+        const textSizeValue = document.getElementById('text-size-value');
+        const posX = document.getElementById('pos-x');
+        const posXValue = document.getElementById('pos-x-value');
+        const posY = document.getElementById('pos-y');
+        const posYValue = document.getElementById('pos-y-value');
+        const posRotate = document.getElementById('pos-rotate');
+        const posRotateValue = document.getElementById('pos-rotate-value');
+        const fillColor = document.getElementById('fill-color');
+        const applyColorsBtn = document.getElementById('apply-colors-btn');
+        const exportJsonBtn = document.getElementById('export-json-btn');
+        const exportTgsBtn = document.getElementById('export-tgs-btn');
+        const resetAnimBtn = document.getElementById('reset-animation-btn');
+        const layerList = document.getElementById('layer-list');
+
+        // Загрузка JSON
+        function loadJSON(jsonData) {
+            animationData = jsonData;
+            animName.textContent = jsonData.nm || 'анимация';
+            renderAnimation();
+            extractLayers();
+            updateLayerList();
+            // Автозаполнение текста, если есть текстовые слои
+            autoFillTextSettings();
+        }
+
+        function renderAnimation() {
+            if (animInstance) {
+                animInstance.destroy();
+                animInstance = null;
+            }
+            lottieContainer.innerHTML = '';
+            placeholderText.style.display = 'none';
+
+            try {
+                animInstance = lottie.loadAnimation({
+                    container: lottieContainer,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: animationData
+                });
+                // Применяем текущие настройки трансформации
+                applyTransform();
+                // Применяем текстовые настройки
+                applyTextSettings();
+                // Применяем цвета
+                applyColors();
+            } catch(e) {
+                console.error('Ошибка загрузки анимации:', e);
+                placeholderText.style.display = 'block';
+                placeholderText.textContent = 'Ошибка загрузки JSON';
+            }
+        }
+
+        // Извлечение слоёв
+        function extractLayers() {
+            layers = [];
+            if (!animationData || !animationData.layers) return;
+            animationData.layers.forEach((layer, index) => {
+                let type = 'shape';
+                if (layer.ty === 5) type = 'text';
+                else if (layer.ty === 2) type = 'image';
+                else if (layer.ty === 1) type = 'solid';
+                layers.push({
+                    index: index,
+                    name: layer.nm || `Слой ${index+1}`,
+                    type: type,
+                    ref: layer
+                });
+            });
+        }
+
+        function updateLayerList() {
+            if (!layers.length) {
+                layerList.innerHTML = '<div style="color:var(--text-dim); font-size:13px;">Нет слоёв</div>';
+                return;
+            }
+            let html = '';
+            layers.forEach(l => {
+                const indicator = `<span class="indicator ${l.type}"></span>`;
+                html += `<div class="layer-item">${indicator} ${l.name}</div>`;
+            });
+            layerList.innerHTML = html;
+        }
+
+        // Автозаполнение текстовых настроек
+        function autoFillTextSettings() {
+            if (!animationData || !animationData.layers) return;
+            // Ищем первый текстовый слой
+            for (let layer of animationData.layers) {
+                if (layer.ty === 5 && layer.t && layer.t.d) {
+                    const textData = layer.t.d;
+                    if (textData.k && textData.k.s) {
+                        const t = textData.k.s;
+                        textContent.value = t.t || '';
+                        // Шрифт, цвет, размер можно попробовать извлечь, но оставим как есть
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Применить текстовые настройки к анимации
+        function applyTextSettings() {
+            if (!animationData || !animInstance) return;
+            const newText = textContent.value;
+            const font = textFont.value;
+            const color = textColor.value;
+            const size = parseInt(textSize.value);
+
+            // Обходим слои и меняем текст
+            animationData.layers.forEach(layer => {
+                if (layer.ty === 5 && layer.t && layer.t.d) {
+                    const textData = layer.t.d;
+                    if (textData.k && textData.k.s) {
+                        const tObj = textData.k.s;
+                        if (newText) tObj.t = newText;
+                        if (font) tObj.f = font;
+                        if (color) tObj.fc = hexToLottieColor(color);
+                        if (size) tObj.s = size;
+                    }
+                }
+            });
+            // Перезагружаем анимацию с обновлёнными данными
+            renderAnimation();
+        }
+
+        // Применить цвета заливки к слоям
+        function applyColors() {
+            if (!animationData || !animInstance) return;
+            const color = fillColor.value;
+            const lottieColor = hexToLottieColor(color);
+            animationData.layers.forEach(layer => {
+                if (layer.ty === 1) { // solid
+                    if (layer.solid && layer.solid.c) {
+                        layer.solid.c = lottieColor;
+                    }
+                }
+                // Для shape layers можно менять цвет заливки, но это сложнее, пропустим
+            });
+            renderAnimation();
+        }
+
+        // Применить трансформацию (позиция, ротация)
+        function applyTransform() {
+            if (!animInstance) return;
+            const x = parseInt(posX.value);
+            const y = parseInt(posY.value);
+            const rot = parseInt(posRotate.value);
+            const container = lottieContainer;
+            container.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+        }
+
+        // Конвертер HEX в Lottie цвет [r,g,b]
+        function hexToLottieColor(hex) {
+            let r = parseInt(hex.slice(1,3), 16) / 255;
+            let g = parseInt(hex.slice(3,5), 16) / 255;
+            let b = parseInt(hex.slice(5,7), 16) / 255;
+            return [r, g, b];
+        }
+
+        // ===== СОБЫТИЯ ИНТЕРФЕЙСА =====
+
+        // Загрузка файла
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#a78bfa'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--border)'; });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--border)';
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const json = JSON.parse(ev.target.result);
+                        loadJSON(json);
+                    } catch(err) {
+                        alert('Невалидный JSON');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const json = JSON.parse(ev.target.result);
+                        loadJSON(json);
+                    } catch(err) {
+                        alert('Невалидный JSON');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Текстовые настройки
+        textContent.addEventListener('input', applyTextSettings);
+        textFont.addEventListener('change', applyTextSettings);
+        textColor.addEventListener('input', () => {
+            document.querySelector('#text-color').parentElement.querySelector('span').textContent = textColor.value;
+            applyTextSettings();
+        });
+        textSize.addEventListener('input', () => {
+            textSizeValue.textContent = textSize.value;
+            applyTextSettings();
+        });
+
+        // Позиция и ротация
+        posX.addEventListener('input', () => {
+            posXValue.textContent = posX.value;
+            applyTransform();
+        });
+        posY.addEventListener('input', () => {
+            posYValue.textContent = posY.value;
+            applyTransform();
+        });
+        posRotate.addEventListener('input', () => {
+            posRotateValue.textContent = posRotate.value + '°';
+            applyTransform();
+        });
+
+        // Цвет заливки
+        fillColor.addEventListener('input', () => {
+            document.querySelector('#fill-color').parentElement.querySelector('span').textContent = fillColor.value;
+        });
+        applyColorsBtn.addEventListener('click', applyColors);
+
+        // Сброс анимации
+        resetAnimBtn.addEventListener('click', () => {
+            if (animInstance) {
+                animInstance.destroy();
+                animInstance = null;
+                lottieContainer.innerHTML = '';
+                placeholderText.style.display = 'block';
+                placeholderText.textContent = 'Анимация сброшена';
+                animName.textContent = 'нет анимации';
+                animationData = null;
+                layers = [];
+                updateLayerList();
+            }
+        });
+
+        // Экспорт JSON
+        exportJsonBtn.addEventListener('click', () => {
+            if (!animationData) return alert('Нет анимации');
+            const jsonStr = JSON.stringify(animationData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'animation.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Экспорт TGS (используем lottie-converter)
+        exportTgsBtn.addEventListener('click', async () => {
+            if (!animationData) return alert('Нет анимации');
+            try {
+                // Если lottie-converter доступен
+                if (typeof LottieConverter !== 'undefined') {
+                    const converter = new LottieConverter();
+                    const tgsBuffer = await converter.convert(animationData);
+                    const blob = new Blob([tgsBuffer], { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'animation.tgs';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                } else {
+                    // fallback: просто скачиваем JSON с расширением .tgs (Telegram принимает и JSON)
+                    const jsonStr = JSON.stringify(animationData);
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'animation.tgs';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            } catch(e) {
+                alert('Ошибка конвертации: ' + e.message);
+            }
+        });
+
+        // ================================================================
+        // 3. АДМИН-ПАНЕЛЬ (загрузка пользователей, выдача подписок)
+        // ================================================================
+        async function loadAdminUsers() {
+            const list = document.getElementById('admin-user-list');
+            if (currentUser.id !== ADMIN_ID) return;
+            try {
+                const res = await fetch(`${API_BASE}/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_id: ADMIN_ID })
+                });
+                if (!res.ok) throw new Error('Ошибка загрузки');
+                const data = await res.json();
+                if (data.users && data.users.length) {
+                    let html = '';
+                    for (const u of data.users) {
+                        const statusText = u.subscription_active ? 'Активна' : 'Не активна';
+                        const cls = u.subscription_active ? 'active' : 'inactive';
+                        const expires = u.expires ? new Date(u.expires * 1000).toLocaleDateString() : '—';
+                        html += `<div class="user-item">
+                            <span>${u.name} (${u.user_id})</span>
+                            <span class="status ${cls}">${statusText} ${u.subscription_type === 'eternal' ? '♾️' : expires}</span>
+                        </div>`;
+                    }
+                    list.innerHTML = html;
+                } else {
+                    list.innerHTML = '<div style="color:var(--text-dim);">Нет пользователей</div>';
+                }
+            } catch(e) {
+                list.innerHTML = '<div style="color:#f87171;">Ошибка загрузки</div>';
+            }
+        }
+
+        // Выдача подписки
+        document.getElementById('admin-grant-btn').addEventListener('click', async () => {
+            const targetId = parseInt(document.getElementById('admin-grant-id').value);
+            const days = parseInt(document.getElementById('admin-grant-days').value);
+            const msgEl = document.getElementById('admin-grant-msg');
+            if (!targetId || !days || days < 1) {
+                msgEl.textContent = 'Введите корректные данные';
+                msgEl.style.color = '#f87171';
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/admin/grant`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: targetId, days: days, admin_id: ADMIN_ID })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msgEl.textContent = '✅ ' + data.message;
+                    msgEl.style.color = '#4ade80';
+                    loadAdminUsers(); // обновляем список
+                } else {
+                    msgEl.textContent = '❌ ' + data.detail;
+                    msgEl.style.color = '#f87171';
+                }
+            } catch(e) {
+                msgEl.textContent = 'Ошибка сервера';
+                msgEl.style.color = '#f87171';
+            }
+        });
+
+        // ================================================================
+        // 4. ИНИЦИАЛИЗАЦИЯ (дополнительно)
+        // ================================================================
+        // Если есть сохранённый JSON в localStorage – можно загрузить
+        // Загружаем демо-анимацию, если хотим (опционально)
+        // Но оставим пустым
+
+        console.log('TgsMaster редактор загружен.');
+    </script>
+</body>
+</html>
