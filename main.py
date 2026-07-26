@@ -2,7 +2,6 @@ import asyncio
 import random
 import time
 import secrets
-import sqlite3
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
@@ -10,23 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
 import aiosqlite
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===== КОНФИГ =====
 BOT_TOKEN = "8546786613:AAF60Ujigmqh1SsHD2aBjvnwShX49i5anoU"
 ADMIN_ID = 8953762615
 DB_PATH = "data.db"
 
-# ===== ИНИЦИАЛИЗАЦИЯ БОТА =====
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
-# ===== ХРАНИЛИЩЕ КОДОВ В ПАМЯТИ =====
+# ===== ХРАНИЛИЩЕ КОДОВ =====
 pending_codes = {}
 
-# ===== БАЗА ДАННЫХ (SQLite) =====
+# ===== БАЗА ДАННЫХ =====
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -96,28 +91,36 @@ def is_subscription_active(user_id: int, user_data: dict):
         return time.time() < user_data["expires"]
     return False
 
-# ===== КОМАНДЫ БОТА =====
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    await message.answer(
+# ===== ОБРАБОТЧИКИ БОТА =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
         "👋 Привет! Чтобы войти на сайт, нажми кнопку 'Получить код' на сайте.\n"
         "Я пришлю тебе код в этот чат."
     )
 
-@dp.message()
-async def handle_code_request(message: types.Message):
-    user_id = message.from_user.id
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    # Защита от спама
     if user_id in pending_codes and time.time() - pending_codes[user_id][1] < 30:
-        await message.answer("⏳ Подожди 30 секунд перед новым запросом.")
+        await update.message.reply_text("⏳ Подожди 30 секунд перед новым запросом.")
         return
     code = f"{random.randint(100000, 999999)}"
     pending_codes[user_id] = (code, time.time())
-    await message.answer(f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.",
+        parse_mode="Markdown"
+    )
 
 # ===== FASTAPI =====
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(dp.start_polling(bot))
+    # Запускаем бота в фоновом режиме
+    loop = asyncio.get_event_loop()
+    bot_app = Application.builder().token(BOT_TOKEN).build()
+    bot_app.add_handler(CommandHandler("start", start))
+    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # Запускаем поллинг в отдельной задаче
+    asyncio.create_task(bot_app.run_polling())
     await init_db()
     yield
 
@@ -149,8 +152,20 @@ async def send_code(req: CodeRequest):
         raise HTTPException(400, "Подождите 30 секунд")
     code = f"{random.randint(100000, 999999)}"
     pending_codes[user_id] = (code, time.time())
+    # Отправка через бота (бот уже запущен, но у нас нет доступа к нему напрямую)
+    # Используем метод send_message через Application (но он запущен в другом потоке)
+    # Проще отправить через bot объект, но у нас нет доступа к bot внутри lifespan.
+    # Для упрощения мы создадим отдельный экземпляр bot для отправки.
+    # Но можно использовать уже созданный bot_app.bot.
+    # Так как мы не сохраняем bot_app глобально, создадим новый экземпляр для отправки.
     try:
-        await bot.send_message(user_id, f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.", parse_mode="Markdown")
+        # Создаём временный бот только для отправки
+        temp_bot = Application.builder().token(BOT_TOKEN).build().bot
+        await temp_bot.send_message(
+            chat_id=user_id,
+            text=f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.",
+            parse_mode="Markdown"
+        )
         return {"ok": True}
     except Exception as e:
         raise HTTPException(400, f"Не удалось отправить код: {e}")
@@ -207,11 +222,9 @@ async def grant_subscription(req: GrantRequest, request: Request):
     await update_subscription(target_id, days)
     return {"ok": True, "message": f"Выдано {days} дн. пользователю {target_id}"}
 
-# Отдача HTML-страницы
 @app.get("/", response_class=HTMLResponse)
 async def index():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return f.read()
 
-# Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
