@@ -17,13 +17,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = "8546786613:AAF60Ujigmqh1SsHD2aBjvnwShX49i5anoU"
+# ===== НОВЫЙ ТОКЕН =====
+BOT_TOKEN = "8546786613:AAGpcqtJFrCi7zSw6jbC50sjudL0dxgYt_M"
 ADMIN_ID = 8953762615
 DB_PATH = "data.db"
 
 pending_codes = {}
 
-# ===== БАЗА ДАННЫХ (без изменений) =====
+# ===== БАЗА ДАННЫХ =====
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -126,20 +127,22 @@ async def lifespan(app: FastAPI):
     global bot_app
     logger.info("Запуск приложения...")
     
-    # Создаём и настраиваем бота
+    # Создаём бота с новым токеном
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Инициализация
     await bot_app.initialize()
     logger.info("Бот инициализирован")
+    
+    # Принудительно удаляем вебхук (если был)
+    await bot_app.bot.delete_webhook()
+    logger.info("Вебхук удалён (если был)")
     
     # Запускаем поллинг в фоне
     asyncio.create_task(bot_app.updater.start_polling())
     logger.info("Бот запущен в режиме поллинга")
     
-    # Инициализация БД
     await init_db()
     
     yield
