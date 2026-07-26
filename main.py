@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 import secrets
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,15 +13,17 @@ import aiosqlite
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ===== КОНФИГ =====
+# ===== ВКЛЮЧАЕМ ЛОГИРОВАНИЕ =====
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 BOT_TOKEN = "8546786613:AAF60Ujigmqh1SsHD2aBjvnwShX49i5anoU"
 ADMIN_ID = 8953762615
 DB_PATH = "data.db"
 
-# ===== ХРАНИЛИЩЕ КОДОВ (code -> { user_id, timestamp }) =====
 pending_codes = {}
 
-# ===== БАЗА ДАННЫХ =====
+# ===== БАЗА ДАННЫХ (без изменений) =====
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -33,6 +36,7 @@ async def init_db():
             )
         """)
         await db.commit()
+        logger.info("База данных инициализирована")
 
 async def get_user(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -92,14 +96,15 @@ def is_subscription_active(user_id: int, user_data: dict):
 
 # ===== ОБРАБОТЧИКИ БОТА =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Команда /start от {update.effective_user.id}")
     await update.message.reply_text(
         "👋 Привет! Напиши мне любое сообщение, и я пришлю тебе код для входа на сайт."
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # Очистка старых кодов этого пользователя (опционально)
-    # Генерируем код
+    logger.info(f"Получено сообщение от {user_id}: {update.message.text}")
+    
     code = f"{random.randint(100000, 999999)}"
     pending_codes[code] = {
         "user_id": user_id,
@@ -111,6 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Код действителен 5 минут.",
         parse_mode="Markdown"
     )
+    logger.info(f"Код {code} отправлен пользователю {user_id}")
 
 # ===== ГЛОБАЛЬНЫЙ ОБЪЕКТ БОТА =====
 bot_app = None
@@ -118,19 +124,29 @@ bot_app = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app
+    logger.info("Запуск приложения...")
+    
+    # Создаём и настраиваем бота
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
+    # Инициализация
     await bot_app.initialize()
-    asyncio.create_task(bot_app.updater.start_polling())
+    logger.info("Бот инициализирован")
     
+    # Запускаем поллинг в фоне
+    asyncio.create_task(bot_app.updater.start_polling())
+    logger.info("Бот запущен в режиме поллинга")
+    
+    # Инициализация БД
     await init_db()
     
     yield
     
     if bot_app:
         await bot_app.shutdown()
+        logger.info("Бот остановлен")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -149,31 +165,29 @@ class GrantRequest(BaseModel):
     user_id: int
     days: int
 
-# ===== НОВЫЙ ЭНДПОИНТ: проверка кода =====
 @app.post("/verify-code")
 async def verify_code(req: VerifyRequest):
     code = req.code.strip()
+    logger.info(f"Попытка входа с кодом {code}")
     if code not in pending_codes:
+        logger.warning(f"Код {code} не найден")
         raise HTTPException(400, "Неверный или истёкший код")
     
     entry = pending_codes[code]
-    if time.time() - entry["timestamp"] > 300:  # 5 минут
+    if time.time() - entry["timestamp"] > 300:
         del pending_codes[code]
+        logger.warning(f"Код {code} истёк")
         raise HTTPException(400, "Код истёк. Запросите новый у бота")
     
     user_id = entry["user_id"]
     del pending_codes[code]
+    logger.info(f"Код {code} подтверждён для пользователя {user_id}")
     
-    # Регистрируем пользователя, если его нет
     user_data = await get_user(user_id)
     if not user_data:
         await create_user(user_id, f"User_{user_id}")
         user_data = await get_user(user_id)
     
-    # Возвращаем сессию (токен)
-    token = secrets.token_urlsafe(32)
-    # Можно сохранить сессию в БД или словаре, но для простоты вернём user_id
-    # и клиент будет хранить его в localStorage
     return {
         "ok": True,
         "user": {
@@ -182,7 +196,6 @@ async def verify_code(req: VerifyRequest):
         }
     }
 
-# ===== АДМИНСКИЕ ЭНДПОИНТЫ =====
 @app.post("/admin/users")
 async def admin_users(req: Request):
     data = await req.json()
