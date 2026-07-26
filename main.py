@@ -2,7 +2,6 @@ import asyncio
 import random
 import time
 import secrets
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -110,23 +109,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# ===== СОЗДАНИЕ ПРИЛОЖЕНИЯ БОТА (глобально) =====
+# ===== СОЗДАЁМ ПРИЛОЖЕНИЕ БОТА (глобально) =====
 bot_app = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global bot_app
-    # Создаём Application (в PTB 21.x нет Updater, всё через Application)
+    # Инициализация бота
     bot_app = Application.builder().token(BOT_TOKEN).build()
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    # Запускаем поллинг в фоновой задаче (не блокируем)
-    asyncio.create_task(bot_app.run_polling())
+    
+    # Запускаем бота в фоновом режиме (не блокируя)
+    await bot_app.initialize()
+    asyncio.create_task(bot_app.start_polling())
+    
+    # Инициализация БД
     await init_db()
+    
     yield
-    # Здесь можно остановить бота при завершении, но для простоты пропустим
+    
+    # Остановка бота при завершении
+    if bot_app:
+        await bot_app.shutdown()
 
-# ===== FASTAPI =====
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -156,7 +162,7 @@ async def send_code(req: CodeRequest):
     code = f"{random.randint(100000, 999999)}"
     pending_codes[user_id] = (code, time.time())
     try:
-        # Используем глобальный объект bot_app для отправки
+        # Используем глобальный объект бота
         await bot_app.bot.send_message(
             chat_id=user_id,
             text=f"🔑 Твой код для входа: `{code}`\nДействителен 5 минут.",
